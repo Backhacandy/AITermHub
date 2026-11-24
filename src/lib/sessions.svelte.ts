@@ -290,6 +290,17 @@ export function continueArgs(preset: Preset, args: string[]): string[] {
   return args;
 }
 
+/** continueArgs의 반대: 이 폴더에 이어 갈 대화가 없을 때(-c면 CLI가 "No conversation found"로 바로 끝난다) 새 대화로 */
+export function withoutContinue(preset: Preset, args: string[]): string[] {
+  const i = args.findIndex((a) => a === preset);
+  if (i < 0) return args;
+  const head = args.slice(0, i + 1);
+  let rest = args.slice(i + 1);
+  if (preset === "claude") rest = rest.filter((a) => a !== "-c" && a !== "--continue");
+  else if (preset === "codex" && rest[0] === "resume") rest = rest.slice(1).filter((a) => a !== "--last");
+  return [...head, ...rest];
+}
+
 export function saveTabs() {
   try {
     const keep = tabs.filter((t) => !t.transient);

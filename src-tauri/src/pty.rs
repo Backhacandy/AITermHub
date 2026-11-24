@@ -36,6 +36,21 @@ struct Session {
     last_output: Arc<AtomicU64>,
     /// 직전 모니터 틱에서 본 트리 누적 CPU 시간(ms).
     last_cpu_ms: u64,
+    /// 마지막으로 맞춘 크기(cols, rows) — 같은 크기면 다시 맞추지 않는다
+    size: (u16, u16),
+    /// 직전 모니터 틱에서 CPU를 많이 썼는지(두 번 연속이어야 일하는 중으로 친다)
+    cpu_busy: bool,
+}
+
+/// 이번 틱의 CPU 사용(delta ms) → (이번 틱 바쁨, 활동으로 칠지). 쉬는 CLI도 가끔 한 틱만 CPU를 튀기므로 두 틱 연속일 때만 활동
+pub(crate) fn cpu_busy_tick(prev_busy: bool, delta: u64) -> (bool, bool) {
+    let busy = delta >= CPU_ACTIVE_MS;
+    (busy, busy && prev_busy)
+}
+
+/// 같은 크기로 다시 맞추면 ConPTY가 화면 전체를 다시 그려 "출력"이 생기고, 쉬는 세션이 잠들지 못한다(화면 배치가 조금만 흔들려도 매번)
+pub(crate) fn size_changed(last: Option<(u16, u16)>, new: (u16, u16)) -> bool {
+    last != Some(new)
 }
 
 /// 모니터 주기(3초) 동안 이만큼 이상 CPU를 쓰면 "작업 중"으로 본다.
@@ -123,13 +138,18 @@ impl PtyManager {
                 pinned: false,
                 last_output,
                 last_cpu_ms: 0,
+                size: (cols, rows),
+                cpu_busy: false,
             },
         );
         Ok(pid)
     }
 
-    /// 세션 stdin에 쓰기. 정지된 세션이면 먼저 깨운다.
+    /// 세션 stdin에 쓰기. 정지된 세션이면 먼저 깨운다(포커스 신호만 온 것은 보기만 한 것이라 깨우지 않고 버린다).
     pub fn write(&self, id: &str, data: &[u8]) -> Result<()> {
+        if is_focus_only(data) && self.sessions.lock().unwrap().get(id).map(|s| s.suspended).unwrap_or(false) {
+            return Ok(());
+        }
         // 정지 상태면 재개(syscall은 락 밖에서)
         let resume_pid = {
             let mut map = self.sessions.lock().unwrap();
@@ -153,14 +173,18 @@ impl PtyManager {
     }
 
     pub fn resize(&self, id: &str, cols: u16, rows: u16) -> Result<()> {
-        let map = self.sessions.lock().unwrap();
-        if let Some(s) = map.get(id) {
+        let mut map = self.sessions.lock().unwrap();
+        if let Some(s) = map.get_mut(id) {
+            if !size_changed(Some(s.size), (cols, rows)) {
+                return Ok(());
+            }
             s.master.resize(PtySize {
                 rows,
                 cols,
                 pixel_width: 0,
                 pixel_height: 0,
             })?;
+            s.size = (cols, rows);
         }
         Ok(())
     }
@@ -231,8 +255,12 @@ impl PtyManager {
             if !suspended {
                 let cpu = crate::procctl::cpu_time_ms(pid);
                 if let Some(s) = self.sessions.lock().unwrap().get_mut(&id) {
-                    if s.last_cpu_ms != 0 && cpu.saturating_sub(s.last_cpu_ms) >= CPU_ACTIVE_MS {
-                        s.last_output.store(now_ms(), Ordering::Relaxed);
+                    if s.last_cpu_ms != 0 {
+                        let (busy, active) = cpu_busy_tick(s.cpu_busy, cpu.saturating_sub(s.last_cpu_ms));
+                        s.cpu_busy = busy;
+                        if active {
+                            s.last_output.store(now_ms(), Ordering::Relaxed);
+                        }
                     }
                     s.last_cpu_ms = cpu;
                 }
@@ -329,6 +357,11 @@ mod path_tests {
     }
 }
 
+/// 터미널 포커스 신호(ESC [ I / ESC [ O)로만 이뤄진 입력인지 — 탭을 누르거나 창을 오갈 때 xterm이 보낸다
+pub(crate) fn is_focus_only(data: &[u8]) -> bool {
+    !data.is_empty() && data.len() % 3 == 0 && data.chunks(3).all(|c| c == b"\x1b[I" || c == b"\x1b[O")
+}
+
 /// 탭 프로세스 명령(spawn과 테스트가 같이 쓴다)
 pub(crate) fn tab_command(program: &str, args: &[String], cwd: &Option<String>, env: &[(String, String)]) -> CommandBuilder {
     let mut cmd = CommandBuilder::new(program);
@@ -399,4 +432,104 @@ pub(crate) fn merge_path(process: &str, registry: &str) -> String {
         }
     }
     out.join(";")
+}
+
+#[cfg(test)]
+mod idle_probe {
+    /// 쉬는 claude가 화면에 뭘 언제 쓰는지 기록(수동): cargo test --lib idle_probe -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn probe_idle_output() {
+        use portable_pty::{native_pty_system, PtySize};
+        use std::io::Read;
+        let dir = std::env::var("AITH_PROBE_DIR").unwrap_or_else(|_| r"C:\Demo\game".into());
+        let secs: u64 = std::env::var("AITH_PROBE_SECS").ok().and_then(|s| s.parse().ok()).unwrap_or(180);
+        let pair = native_pty_system().openpty(PtySize { rows: 40, cols: 120, pixel_width: 0, pixel_height: 0 }).unwrap();
+        let extra = std::env::var("AITH_PROBE_ARGS").unwrap_or_default();
+        let mut a: Vec<String> = vec!["/k".into(), "claude".into()];
+        a.extend(extra.split_whitespace().map(String::from));
+        let cmd = super::tab_command("cmd.exe", &a, &Some(dir), &[]);
+        let mut child = pair.slave.spawn_command(cmd).unwrap();
+        let mut r = pair.master.try_clone_reader().unwrap();
+        let _w = pair.master.take_writer().unwrap();
+        let start = std::time::Instant::now();
+        let (tx, rx) = std::sync::mpsc::channel::<(u128, Vec<u8>)>();
+        std::thread::spawn(move || {
+            let mut buf = [0u8; 8192];
+            while let Ok(n) = r.read(&mut buf) {
+                if n == 0 { break; }
+                let _ = tx.send((start.elapsed().as_millis(), buf[..n].to_vec()));
+            }
+        });
+        let mut resized = 0;
+        while start.elapsed().as_secs() < secs {
+            // 조용해진 뒤 같은 크기로 다시 맞추기(앱의 ResizeObserver가 하는 일)
+            if std::env::var("AITH_PROBE_RESIZE").is_ok() && resized < 3 && start.elapsed().as_secs() >= 30 + resized * 15 {
+                resized += 1;
+                println!("--- 같은 크기로 resize #{resized}");
+                let _ = pair.master.resize(PtySize { rows: 40, cols: 120, pixel_width: 0, pixel_height: 0 });
+            }
+            if let Ok((t, b)) = rx.recv_timeout(std::time::Duration::from_millis(500)) {
+                if t > 20_000 {
+                    let s: String = String::from_utf8_lossy(&b).chars().map(|c| if c.is_control() { '.' } else { c }).take(160).collect();
+                    println!("{:>7}ms {:>5}B {}", t, b.len(), s);
+                }
+            }
+        }
+        let _ = child.kill();
+    }
+}
+
+#[cfg(test)]
+mod resize_tests {
+    use super::size_changed;
+
+    /// 같은 크기로 다시 맞추면 ConPTY가 화면 전체를 다시 그려(약 1.4KB) "출력"이 되고, 쉬는 세션이 영영 잠들지 못한다
+    #[test]
+    fn same_size_is_not_a_change() {
+        assert!(size_changed(None, (120, 40)), "처음은 맞춘다");
+        assert!(!size_changed(Some((120, 40)), (120, 40)), "같은 크기는 건너뛴다");
+        assert!(size_changed(Some((120, 40)), (121, 40)));
+        assert!(size_changed(Some((120, 40)), (120, 41)));
+    }
+}
+
+#[cfg(test)]
+mod cpu_tests {
+    use super::{cpu_busy_tick, CPU_ACTIVE_MS};
+
+    /// 쉬는 Claude는 1~2분마다 3초 구간에 CPU를 110~160ms 튀긴다 — 한 번 튄 것은 일로 치지 않는다(안 그러면 영영 못 잔다)
+    #[test]
+    fn single_burst_is_not_work() {
+        let (busy, active) = cpu_busy_tick(false, CPU_ACTIVE_MS + 10);
+        assert!(busy && !active, "한 번 튀면 표시만 하고 활동으로 치지 않는다");
+        let (busy, active) = cpu_busy_tick(busy, 5);
+        assert!(!busy && !active, "다음 틱에 조용하면 끝");
+    }
+
+    /// 빌드처럼 계속 CPU를 쓰면 두 번째 틱부터 일하는 중
+    #[test]
+    fn sustained_cpu_is_work() {
+        let (b1, a1) = cpu_busy_tick(false, 900);
+        let (b2, a2) = cpu_busy_tick(b1, 900);
+        assert!(b1 && !a1);
+        assert!(b2 && a2);
+    }
+}
+
+#[cfg(test)]
+mod focus_tests {
+    use super::is_focus_only;
+
+    /// 탭을 누르거나 창을 오가면 터미널이 포커스 신호를 보낸다 — 보기만 한 것이니 잠든 세션을 깨우지 않는다
+    #[test]
+    fn focus_reports_only() {
+        assert!(is_focus_only(b"\x1b[I"));
+        assert!(is_focus_only(b"\x1b[O"));
+        assert!(is_focus_only(b"\x1b[O\x1b[I"));
+        assert!(!is_focus_only(b""), "빈 입력은 해당 없음");
+        assert!(!is_focus_only(b"a"));
+        assert!(!is_focus_only(b"\x1b[Ia"), "실제 입력이 섞이면 깨운다");
+        assert!(!is_focus_only(b"\r"));
+    }
 }

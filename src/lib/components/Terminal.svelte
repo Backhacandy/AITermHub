@@ -9,6 +9,7 @@
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { settings } from "$lib/settings.svelte";
   import { markOutput } from "$lib/stats.svelte";
+  import { withoutContinue } from "$lib/sessions.svelte";
 
   let {
     id = "main",
@@ -101,8 +102,16 @@
       return true;
     });
 
+    // 복원한 탭은 "이어서"(claude -c / codex resume --last)로 뜬다 — 이 폴더에 대화가 없으면 CLI가 바로 끝나므로 새 대화로
+    let runArgs = args;
+    const cli = args.includes("claude") && (args.includes("-c") || args.includes("--continue")) ? "claude"
+      : args.includes("codex") && args.includes("resume") && args.includes("--last") ? "codex" : null;
+    if (cli && cwd) {
+      const list = await invoke<unknown[]>(cli === "claude" ? "claude_sessions" : "codex_sessions", { cwd, limit: 1 }).catch(() => null);
+      if (Array.isArray(list) && list.length === 0) runArgs = withoutContinue(cli, args);
+    }
     try {
-      await invoke("session_create", { id, program, args, cwd, cols: term.cols, rows: term.rows, env: env ?? null });
+      await invoke("session_create", { id, program, args: runArgs, cwd, cols: term.cols, rows: term.rows, env: env ?? null });
     } catch (err) {
       term.write(`\r\n\x1b[31m[세션 시작 실패: ${err}]\x1b[0m\r\n`);
       exited = true;

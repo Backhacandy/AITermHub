@@ -103,3 +103,18 @@ describe("최근 닫은 팀", () => {
     expect(closedTeams()).toEqual([]);
   });
 });
+
+import { withoutContinue } from "./sessions.svelte";
+describe("이어 갈 대화가 없으면 '이어서'를 빼고 새로 시작", () => {
+  it("claude -c → claude(다른 인자는 그대로)", () => {
+    expect(withoutContinue("claude", ["/k", "claude", "-c", "--model", "opus"])).toEqual(["/k", "claude", "--model", "opus"]);
+    expect(withoutContinue("claude", ["/k", "claude", "--continue"])).toEqual(["/k", "claude"]);
+  });
+  it("codex resume --last → codex", () => {
+    expect(withoutContinue("codex", ["/k", "codex", "resume", "--last", "-m", "x"])).toEqual(["/k", "codex", "-m", "x"]);
+  });
+  it("이어서가 없으면 그대로", () => {
+    expect(withoutContinue("claude", ["/k", "claude", "--model", "opus"])).toEqual(["/k", "claude", "--model", "opus"]);
+    expect(withoutContinue("powershell", ["-NoExit"])).toEqual(["-NoExit"]);
+  });
+});

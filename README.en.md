@@ -17,7 +17,7 @@ Juggling several projects with AI CLIs creates a loop: keep every session open a
 
 ## What it does
 
-- **Sleeps idle sessions** — after 2 minutes idle the process is suspended and its memory released; after an hour it's stopped (the conversation stays). It waits an hour because the server-side prompt cache lasts an hour.
+- **Sleeps idle sessions** — idle sessions are suspended and their memory released (structured Claude tabs after 2 minutes, terminal tabs after 15 — configurable); after an hour it's stopped (the conversation stays). It waits an hour because the server-side prompt cache lasts an hour.
 - **Cost-aware compaction** — compacts a long conversation when "extra cost of not compacting" exceeds "cost of compacting", so resuming carries less context.
 - **Resume after restart** — close the app or reboot and the work continues in the same conversation.
 - **Stuck-command detection** — commands far past their timeout are unstuck and the agent continues; sessions that say "working" but are frozen show as "not responding".
