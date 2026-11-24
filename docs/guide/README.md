@@ -9,10 +9,11 @@
 - Claude Code·Codex CLI가 설치돼 있는지 확인해요. 없으면 설치 명령을 복사해 터미널에서 실행한 뒤 **다시 확인**.
   - Claude Code(PowerShell): `irm https://claude.ai/install.ps1 | iex`
   - Codex: `npm install -g @openai/codex`
-- 로그인은 첫 세션을 열면 각 CLI가 안내해요. AITermHub는 로그인 정보를 읽거나 옮기지 않아요.
+- Gemini·Qwen·OpenCode·Copilot·Cursor·Aider 같은 다른 AI CLI가 깔려 있으면 그것도 찾아요. 하나만 있어도 돼요.
+- Claude·Codex는 이미 로그인돼 있는지 CLI에게 직접 물어 보여 줘요. 로그인은 첫 세션을 열면 각 CLI가 안내해요. AITermHub는 로그인 정보 파일을 읽거나 옮기지 않아요.
 
 ## 3. 세션 열기
-- 위쪽 **＋ → 새로 만들기**에서 Claude 또는 Codex를 고르고 프로젝트 폴더를 정해요.
+- 위쪽 **＋ → 새로 만들기**에서 Claude·Codex 또는 이 PC에 있는 다른 AI를 고르고 프로젝트 폴더를 정해요. 다른 AI는 터미널 탭으로 열려요.
 - 왼쪽은 대화, 오른쪽은 작업 현황(읽은 파일·바꾼 파일·실행한 명령)이에요.
 - 같은 폴더의 지난 대화를 이어 가려면 **대화 ▾**에서 골라요.
 

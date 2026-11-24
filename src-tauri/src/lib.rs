@@ -25,6 +25,7 @@ mod modelhist;
 mod flight;
 mod portfolio;
 mod cliupdate;
+mod login;
 mod grass;
 mod preview;
 mod registry;
@@ -434,6 +435,12 @@ fn autostart_get() -> bool {
     autostart::get()
 }
 
+/// 업데이트 설치 직전(on)·실패 뒤(off): 설치 파일이 앱과 같이 꺼지지 않게 이 뒤에 띄우는 프로세스를 Job 밖으로
+#[tauri::command]
+fn update_breakaway(on: bool) -> Result<(), String> {
+    procctl::installer_breakaway(on).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn autostart_set(on: bool) -> Result<(), String> {
     autostart::set(on)
@@ -609,6 +616,7 @@ pub fn run() {
             accounts_login_spec,
             autostart_get,
             autostart_set,
+            update_breakaway,
             remote_list,
             open_path,
             which_cli,
@@ -618,6 +626,7 @@ pub fn run() {
             github::gh_repo_create,
             github::gh_noreply,
             cliupdate::cli_update,
+            login::cli_login,
             portfolio::portfolio_scan,
             portfolio::gh_profile_get,
             portfolio::gh_profile_put,
@@ -669,6 +678,11 @@ pub fn run() {
             // 앱이 어떻게 꺼지든 자식 프로세스(claude/codex/터미널)가 함께 종료되게 한다.
             if let Err(e) = procctl::init_kill_on_close_job() {
                 eprintln!("kill-on-close job 설정 실패: {e}");
+            }
+            // 창 제목으로 배포판·개발판을 구분한다(둘 다 켜 두면 어느 창인지 헷갈림) — 기본값(tauri.conf.json)은 개발판 이름
+            #[cfg(not(feature = "multi-account"))]
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.set_title("AITermHub");
             }
             // 에이전트용 aith-open(GUI 프로그램을 허브와 분리해 실행) — 모든 자식이 PATH로 쓴다
             if let Some(bin) = tools::install(app.handle()) {

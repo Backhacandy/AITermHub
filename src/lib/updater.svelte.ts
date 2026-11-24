@@ -27,6 +27,7 @@ export const upd = $state<{ available: string | null; deferred: boolean; install
 });
 
 let idleTimer: ReturnType<typeof setInterval> | undefined;
+let watchTimer: ReturnType<typeof setTimeout> | undefined;
 
 export function resetForTest() {
   upd.available = null;
@@ -35,14 +36,31 @@ export function resetForTest() {
   upd.error = "";
   clearInterval(idleTimer);
   idleTimer = undefined;
+  clearTimeout(watchTimer);
+  watchTimer = undefined;
 }
 
-export async function checkNow(d: UpdateDeps): Promise<void> {
+/** 확인했으면 true(새 버전 유무와 상관없이), 오류(오프라인·GitHub 응답 이상)면 false */
+export async function checkNow(d: UpdateDeps): Promise<boolean> {
   try {
     const u = await d.check();
     if (u) upd.available = u.version;
+    return true;
   } catch {
-    // 오프라인·GitHub 응답 이상 — 다음 확인 때 다시
+    return false;
+  }
+}
+
+/** 실제 설치 순서. 앱은 자식이 앱과 같이 꺼지는 Job 안에서 돌아서, 그대로 두면 설치 파일도 앱이 꺼질 때 같이 꺼진다.
+ *  다 받은 뒤 Job 밖으로 풀고(breakaway) 설치한다 — 성공하면 앱이 꺼지고, 실패하면 되돌린다 */
+export async function installSteps(s: { download: () => Promise<void>; breakaway: (on: boolean) => Promise<void>; install: () => Promise<void> }): Promise<void> {
+  await s.download();
+  await s.breakaway(true);
+  try {
+    await s.install();
+  } catch (e) {
+    await s.breakaway(false).catch(() => {});
+    throw e;
   }
 }
 
@@ -87,11 +105,23 @@ export function dismiss() {
 }
 
 const DAY = 24 * 60 * 60_000;
+/** 확인에 실패했을 때 다시 해 볼 간격(켜자마자 네트워크가 아직 없을 때 등) */
+export const RETRY_MS = 10 * 60_000;
+
+/** 켜고 10초 뒤 확인 → 되면 하루 뒤, 실패하면 10분 뒤 다시 */
+export function watchLoop(d: UpdateDeps): void {
+  const run = async () => {
+    const ok = await checkNow(d);
+    watchTimer = setTimeout(run, ok ? DAY : RETRY_MS);
+  };
+  clearTimeout(watchTimer);
+  watchTimer = setTimeout(run, 10_000);
+}
+
 let started = false;
 /** 앱 시작 때 한 번. 개발판이면 아무것도 하지 않는다 */
 export function startUpdateWatch(d: UpdateDeps): void {
   if (started || flavor() !== "release") return;
   started = true;
-  setTimeout(() => void checkNow(d), 10_000);
-  setInterval(() => void checkNow(d), DAY);
+  watchLoop(d);
 }

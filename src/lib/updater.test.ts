@@ -14,7 +14,7 @@ beforeEach(() => resetForTest());
 
 describe("자동 업데이트", () => {
   it("확인하다 오류가 나면(네트워크 없음 등) 조용히 넘어간다", async () => {
-    await expect(checkNow(deps({ check: async () => { throw new Error("offline"); } }))).resolves.toBeUndefined();
+    await expect(checkNow(deps({ check: async () => { throw new Error("offline"); } }))).resolves.toBe(false); // 앱을 멈추지 않고 실패만 알린다(곧 다시 확인)
     expect(upd.available).toBeNull();
   });
 
@@ -75,6 +75,79 @@ describe("'일이 끝난 뒤'를 취소", () => {
     expect(upd.available).toBe("0.9.0-beta.2");
     await vi.advanceTimersByTimeAsync(120_000);
     expect(install).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+});
+
+import { installSteps } from "./updater.svelte";
+describe("설치 순서: 설치 파일이 앱과 같이 꺼지지 않게", () => {
+  it("다 받은 뒤에 Job 밖으로 풀고 설치한다", async () => {
+    const log: string[] = [];
+    await installSteps({
+      download: async () => void log.push("download"),
+      breakaway: async (on) => void log.push(`breakaway:${on}`),
+      install: async () => void log.push("install"),
+    });
+    expect(log).toEqual(["download", "breakaway:true", "install"]);
+  });
+  it("받다가 실패하면 Job은 건드리지 않는다", async () => {
+    const log: string[] = [];
+    await expect(installSteps({
+      download: async () => { throw new Error("net"); },
+      breakaway: async (on) => void log.push(`breakaway:${on}`),
+      install: async () => void log.push("install"),
+    })).rejects.toThrow("net");
+    expect(log).toEqual([]);
+  });
+  it("설치가 실패하면 원래대로 되돌린다(새 자식이 다시 Job 안으로)", async () => {
+    const log: string[] = [];
+    await expect(installSteps({
+      download: async () => {},
+      breakaway: async (on) => void log.push(`breakaway:${on}`),
+      install: async () => { throw new Error("bad sig"); },
+    })).rejects.toThrow("bad sig");
+    expect(log).toEqual(["breakaway:true", "breakaway:false"]);
+  });
+});
+
+import { watchLoop, RETRY_MS } from "./updater.svelte";
+describe("업데이트 확인이 실패하면 곧 다시", () => {
+  it("켜고 10초 뒤 확인, 실패하면 10분 뒤 다시, 되면 알린다", async () => {
+    vi.useFakeTimers();
+    resetForTest();
+    let n = 0;
+    const d: UpdateDeps = {
+      check: async () => {
+        n++;
+        if (n === 1) throw new Error("offline");
+        return { version: "9.9.9" };
+      },
+      install: async () => {},
+      relaunch: async () => {},
+      busy: () => false,
+    };
+    watchLoop(d);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(n).toBe(1);
+    expect(upd.available).toBeNull();
+    expect(RETRY_MS).toBe(10 * 60_000);
+    await vi.advanceTimersByTimeAsync(RETRY_MS);
+    expect(n).toBe(2);
+    expect(upd.available).toBe("9.9.9");
+    resetForTest();
+    vi.useRealTimers();
+  });
+  it("확인이 되면(새 버전 없음) 하루 뒤에 다시", async () => {
+    vi.useFakeTimers();
+    resetForTest();
+    let n = 0;
+    const d: UpdateDeps = { check: async () => (n++, null), install: async () => {}, relaunch: async () => {}, busy: () => false };
+    watchLoop(d);
+    await vi.advanceTimersByTimeAsync(10_000 + RETRY_MS);
+    expect(n).toBe(1);
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+    expect(n).toBe(2);
+    resetForTest();
     vi.useRealTimers();
   });
 });

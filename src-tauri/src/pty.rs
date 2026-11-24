@@ -97,6 +97,9 @@ impl PtyManager {
         ] {
             cmd.env_remove(key);
         }
+        // cmd.exe가 명령 이름(claude·gemini 등)을 찾을 때 작업 폴더를 먼저 보지 않게 한다 —
+        // 받은 저장소에 같은 이름의 .cmd/.bat이 있으면 진짜 CLI 대신 실행되는 것을 막는다(PATH에서만 찾음)
+        cmd.env("NoDefaultCurrentDirectoryInExePath", "1");
         for (k, v) in &env {
             cmd.env(k, v);
         }

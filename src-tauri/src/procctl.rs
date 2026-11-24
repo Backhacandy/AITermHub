@@ -15,7 +15,7 @@ use windows::Win32::System::Diagnostics::ToolHelp::{
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
     SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK,
 };
 use windows::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
 use windows::Win32::System::ProcessStatus::{
@@ -220,21 +220,46 @@ pub fn job_active() -> bool {
 /// 앱 프로세스를 "닫히면 전부 종료" Job에 넣는다. 이후 만든 자식(claude/codex/pty와
 /// 그 자손)은 Job을 상속하므로, 앱이 어떤 식으로 꺼지든(강제 종료 포함) 고아로 남지 않는다.
 pub fn init_kill_on_close_job() -> Result<()> {
+    let job = kill_on_close_job()?;
+    unsafe { AssignProcessToJobObject(job, GetCurrentProcess())? };
+    // 핸들은 일부러 닫지 않는다: 프로세스 종료 시 OS가 닫으면서 Job 전체가 종료된다.
+    let _ = JOB.set(job.0 as isize);
+    JOB_OK.store(true, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
+}
+
+/// 앱의 Job 핸들(설치 직전에 다시 손대려고 보관)
+static JOB: std::sync::OnceLock<isize> = std::sync::OnceLock::new();
+
+fn kill_on_close_job() -> Result<HANDLE> {
+    let job = unsafe { CreateJobObjectW(None, None)? };
+    set_breakaway(job, false)?;
+    Ok(job)
+}
+
+/// on: 이 뒤에 띄우는 프로세스는 Job에 들어가지 않는다(먼저 있던 자식은 그대로 Job 안).
+/// 업데이트 설치 파일이 앱과 같이 꺼지지 않게 설치 직전에 켠다
+fn set_breakaway(job: HANDLE, on: bool) -> Result<()> {
+    let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+    info.BasicLimitInformation.LimitFlags =
+        if on { JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK } else { JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE };
     unsafe {
-        let job = CreateJobObjectW(None, None)?;
-        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         SetInformationJobObject(
             job,
             JobObjectExtendedLimitInformation,
             &info as *const _ as *const std::ffi::c_void,
             std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
         )?;
-        AssignProcessToJobObject(job, GetCurrentProcess())?;
-        // 핸들은 일부러 닫지 않는다: 프로세스 종료 시 OS가 닫으면서 Job 전체가 종료된다.
     }
-    JOB_OK.store(true, std::sync::atomic::Ordering::SeqCst);
     Ok(())
+}
+
+/// 업데이트 설치 직전(on)·설치 실패 뒤(off). Job이 없으면(초기화 실패) 할 일 없음
+pub fn installer_breakaway(on: bool) -> Result<()> {
+    match JOB.get() {
+        Some(&h) => set_breakaway(HANDLE(h as *mut std::ffi::c_void), on),
+        None => Ok(()),
+    }
 }
 
 /// 지정 PID에 대해 핸들을 열고 클로저를 실행(정리 보장).
@@ -362,5 +387,44 @@ mod snapshot_bench {
         let b: u64 = super::one_snapshot(|| roots.iter().map(|&p| super::working_set_bytes(p)).sum());
         let shared = t.elapsed();
         println!("뿌리 {}개: 따로 {:?} · 한 장 {:?} (메모리 합 {}MB / {}MB)", roots.len(), plain, shared, a >> 20, b >> 20);
+    }
+}
+
+#[cfg(test)]
+mod job_tests {
+    use super::*;
+    use windows::Win32::Foundation::BOOL;
+    use windows::Win32::System::JobObjects::IsProcessInJob;
+
+    fn in_job(child: &std::process::Child, job: HANDLE) -> bool {
+        use std::os::windows::io::AsRawHandle;
+        let mut r = BOOL(0);
+        unsafe { IsProcessInJob(HANDLE(child.as_raw_handle()), job, &mut r).unwrap() };
+        r.as_bool()
+    }
+
+    /// 업데이트 설치 파일은 앱이 꺼질 때 같이 꺼지면 안 된다: 설치 직전에 켜면 그 뒤에 띄운 프로세스는 Job 밖에서 돈다.
+    /// 그 전부터 있던 자식(claude·codex)은 그대로 Job 안 — 앱이 꺼지면 같이 꺼진다
+    #[test]
+    fn installer_escapes_job_but_old_children_stay() {
+        use std::os::windows::process::CommandExt;
+        let spawn = || std::process::Command::new("cmd").args(["/c", "ping -n 5 127.0.0.1 >nul"]).creation_flags(0x0800_0000).spawn().unwrap();
+        let job = kill_on_close_job().unwrap();
+        unsafe { AssignProcessToJobObject(job, GetCurrentProcess()).unwrap() };
+        let mut old = spawn();
+        assert!(in_job(&old, job), "켜기 전 자식은 Job 안");
+        set_breakaway(job, true).unwrap();
+        let mut installer = spawn();
+        let old_still = in_job(&old, job);
+        let installer_in = in_job(&installer, job);
+        set_breakaway(job, false).unwrap();
+        let mut after = spawn();
+        let after_in = in_job(&after, job);
+        for c in [&mut old, &mut installer, &mut after] {
+            let _ = c.kill();
+        }
+        assert!(old_still, "먼저 있던 자식은 계속 Job 안(앱과 같이 꺼짐)");
+        assert!(!installer_in, "설치 직전 뒤에 띄운 것은 Job 밖(앱이 꺼져도 남음)");
+        assert!(after_in, "다시 끄면(설치 실패 시) 원래대로");
     }
 }

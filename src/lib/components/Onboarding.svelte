@@ -1,20 +1,26 @@
 <!-- Copyright (c) 2026 Backhacandy. Licensed under AGPL-3.0-or-later. -->
 <script lang="ts">
-  // 처음 켰을 때 세 장: ① Claude Code·Codex 설치 확인 ② 쉬는 세션은 잠든다 ③ 다시 오면 이어진다
+  // 처음 켰을 때 세 장: ① PC에 있는 AI CLI 찾기(로그인 여부는 CLI에게 묻는다) ② 쉬는 세션은 잠든다 ③ 다시 오면 이어진다
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { detect, nextStep, restartHint, INSTALL_CMD, DOCS, type CliStatus } from "$lib/onboarding";
+  import { detect, nextStep, restartHint, loginLabel, INSTALL_CMD, DOCS, type CliStatus } from "$lib/onboarding";
+  import { agentById } from "$lib/agents/registry";
 
   let { ondone }: { ondone: () => void } = $props();
   let page = $state(0);
   let st = $state<CliStatus | null>(null);
   let checking = $state(false);
   let copied = $state("");
+  /** Claude·Codex 로그인 여부(undefined = 확인 중) */
+  let login = $state<Record<string, boolean | null | undefined>>({});
 
   async function recheck() {
     checking = true;
     st = await detect((names) => invoke<(string | null)[]>("which_cli", { names }));
     checking = false;
+    login = {};
+    for (const k of ["claude", "codex"] as const)
+      if (st[k] === "installed") invoke<boolean | null>("cli_login", { cli: k }).then((v) => (login[k] = v)).catch(() => (login[k] = null));
   }
   onMount(recheck);
 
@@ -31,12 +37,12 @@
   <div class="card">
     {#if page === 0}
       <h2>AITermHub에 오신 걸 환영해요</h2>
-      <p>AI 코딩 CLI(Claude Code·Codex)를 여러 개 켜 둬도 PC가 가볍게 유지되도록 돕는 세션 관리자예요. 먼저 CLI가 설치돼 있는지 볼게요.</p>
+      <p>AI 코딩 CLI(Claude Code·Codex·Gemini 등)를 여러 개 켜 둬도 PC가 가볍게 유지되도록 돕는 세션 관리자예요. 이 PC에 있는 AI부터 찾아볼게요.</p>
       {#each ["claude", "codex"] as const as k (k)}
         <div class="row">
           <span class="nm">{k === "claude" ? "Claude Code" : "Codex"}</span>
           {#if st === null}<span class="dim">확인 중…</span>
-          {:else if st[k] === "installed"}<span class="ok">설치됨</span>
+          {:else if st[k] === "installed"}<span class="ok" class:warn={login[k] === false}>{loginLabel(login[k])}</span>
           {:else}
             <span class="no">없음</span>
             <code>{INSTALL_CMD[k]}</code>
@@ -45,7 +51,11 @@
           {/if}
         </div>
       {/each}
-      {#if st && !ready}<p class="dim">둘 중 하나만 있어도 돼요. 터미널에서 위 명령으로 설치한 뒤 다시 확인을 눌러 주세요(Codex는 Node.js가 필요해요). 로그인은 첫 세션을 열면 CLI가 안내해요. {restartHint(st)}</p>{/if}
+      {#if st?.others.length}
+        <div class="row"><span class="nm">다른 AI</span><span class="ok">{st.others.map((id) => agentById(id)?.name ?? id).join(" · ")}</span></div>
+        <p class="dim">다른 AI는 위쪽 ＋ → 새로 만들기에서 바로 열 수 있어요. 로그인은 처음 열 때 각 AI가 안내해요.</p>
+      {/if}
+      {#if st && !ready}<p class="dim">하나만 있어도 돼요(Gemini 같은 다른 AI도 돼요). 터미널에서 위 명령으로 설치한 뒤 다시 확인을 눌러 주세요(Codex는 Node.js가 필요해요). 로그인은 첫 세션을 열면 CLI가 안내해요. {restartHint(st)}</p>{/if}
       <div class="nav">
         <button onclick={recheck} disabled={checking}>다시 확인</button>
         <span class="sp"></span>
@@ -72,6 +82,7 @@
   .row { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; font-size: 13px; }
   .nm { width: 100px; font-weight: 600; }
   .ok { color: var(--ok, #6c6); }
+  .ok.warn { color: var(--warn, #db6); }
   .no { color: var(--danger, #f77); }
   code { font-size: 12px; padding: 2px 6px; border-radius: 4px; background: rgba(127, 127, 127, 0.15); }
   .dim { opacity: 0.7; }

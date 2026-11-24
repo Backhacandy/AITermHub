@@ -2,9 +2,11 @@
 <script lang="ts">
   // 새로 만들기: ① 무엇을(팀·Claude·Codex·터미널) ② 폴더 ③ 팀이면 라이트·맥스. 나머지 옵션은 "자세히"에 접는다.
   // 새 팀은 팀장 하나로 시작한다(자세히에서 에이전트를 직접 넣거나 AI 제안을 받을 수 있다).
-  import { untrack } from "svelte";
+  import { untrack, onMount } from "svelte";
+  import { invoke } from "@tauri-apps/api/core";
   import { open, ask } from "@tauri-apps/plugin-dialog";
-  import { addSession, addClaude, addCodex, addTeam, tabs, ROLE_LABELS, type Preset, type Role } from "$lib/sessions.svelte";
+  import { addSession, addClaude, addCodex, addTeam, addCliAgent, tabs, ROLE_LABELS, type Preset, type Role } from "$lib/sessions.svelte";
+  import { CLI_AGENTS, agentById, launchArgs } from "$lib/agents/registry";
   import { teamEnabled } from "$lib/experimental";
   import { settings, saveSettings } from "$lib/settings.svelte";
   import { LANE_MODELS, EFFORTS, AUTO } from "$lib/pair/models";
@@ -23,7 +25,19 @@
   /** 무엇을: 팀 · 한 명(Claude·Codex) · 터미널 */
   /** 팀은 실험 기능(설정에서 켰거나 이미 팀 탭이 있을 때만) */
   const teamOn = teamEnabled(settings, tabs.filter((t) => t.kind === "pair").length);
-  let kind = $state<"team" | "claude" | "codex" | "powershell">(init === "powershell" ? "powershell" : init === "codex" ? "codex" : teamOn ? "team" : "claude");
+  let kind = $state<"team" | "claude" | "codex" | "powershell" | "other">(init === "powershell" ? "powershell" : init === "codex" ? "codex" : teamOn ? "team" : "claude");
+  /** 이 PC에 설치된 다른 AI(Gemini 등) — 찾은 것만 버튼으로 보인다 */
+  let otherFound = $state<string[]>([]);
+  let otherId = $state("");
+  let other = $derived(kind === "other" ? agentById(otherId) : undefined);
+  onMount(async () => {
+    const r = await invoke<(string | null)[]>("which_cli", { names: CLI_AGENTS.map((a) => a.cmd) }).catch(() => [] as (string | null)[]);
+    otherFound = CLI_AGENTS.filter((_, i) => r[i]).map((a) => a.id);
+  });
+  function pickOther(id: string) {
+    otherId = id;
+    pickKind("other");
+  }
   /** 팀 운영 방식 */
   let teamMode = $state<TeamMode>(settings.defaultMode ?? "lite");
   /** 자세히(나머지 옵션) */
@@ -135,13 +149,14 @@
   }
 
   let preview = $derived.by(() => {
+    if (other) return ["cmd.exe", ...launchArgs(other, !!settings.fullAccess)].join(" ") + " — 터미널 탭(로그인은 처음 열 때 이 AI가 안내)";
     if (team) return `팀 — 팀장(${MODES[teamMode].label} · ${MODES[teamMode].leadModel})${rows.length ? ` + 에이전트 ${rows.length}명` : " 하나로 시작 · 팀장이 필요한 에이전트를 만들어요"}`;
     if (mode === "structured" && preset !== "powershell") return `${preset === "claude" ? "Claude" : "Codex"} 구조화 세션 — 왼쪽 대화 / 오른쪽 작업현황`;
     const { program, args } = buildArgs();
     return [program, ...args].join(" ");
   });
 
-  let canLaunch = $derived(kind === "powershell" || single || (team && !!cwd && !proposing));
+  let canLaunch = $derived(kind === "powershell" || single || !!other || (team && !!cwd && !proposing));
 
   async function launchTeam() {
     const key = cwd.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
@@ -163,6 +178,11 @@
       if (!ok) return;
     }
     if (cwd) { settings.lastCwd = cwd; saveSettings(); }
+    if (other) {
+      addCliAgent(other, launchArgs(other, !!settings.fullAccess), cwd);
+      onclose();
+      return;
+    }
 
     if (team && teamMode === "max") {
       const ok = await ask("맥스로 만든 팀은 나중에 라이트로 바꿀 수 없어요.\n라이트로 만들면 나중에 맥스로 바꿀 수 있어요. 맥스로 만들까요?", {
@@ -201,6 +221,13 @@
         <button class:on={kind === "codex"} onclick={() => pickKind("codex")}><span class="dot" data-preset="codex"></span>Codex</button>
         <button class:on={kind === "powershell"} onclick={() => pickKind("powershell")}><span class="dot" data-preset="powershell"></span>터미널</button>
       </div>
+      {#if otherFound.length}
+        <div class="seg others" aria-label="이 PC에 있는 다른 AI">
+          {#each otherFound as id (id)}
+            <button class:on={kind === "other" && otherId === id} onclick={() => pickOther(id)}><span class="dot" data-preset="agent"></span>{agentById(id)?.name ?? id}</button>
+          {/each}
+        </div>
+      {/if}
 
       <div class="step"><span class="no">2</span>폴더</div>
       <div class="pick">
@@ -216,7 +243,7 @@
         </div>
       {/if}
 
-      {#if kind !== "powershell"}
+      {#if kind !== "powershell" && kind !== "other"}
         <button class="more-btn" onclick={() => (more = !more)}>자세히 {more ? "▾" : "▸"}</button>
       {/if}
 
@@ -385,6 +412,9 @@
   .step { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; color: var(--fg-dim); font-size: 12.5px; font-weight: 600; }
   .step .no { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 11px; }
   .seg.four button { padding: 12px 8px; }
+  .seg.four:has(+ .others) { margin-bottom: 8px; }
+  .seg.others { flex-wrap: wrap; }
+  .seg.others button { flex: 0 1 auto; padding: 7px 12px; font-size: 12.5px; }
   .seg button .mt { font-weight: 600; color: var(--fg); }
   .seg button .md { color: var(--muted); font-size: 11.5px; }
   .seg button:has(.mt) { flex-direction: column; gap: 3px; }

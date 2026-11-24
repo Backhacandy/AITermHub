@@ -1,6 +1,6 @@
 [package]
 name = "aitermhub"
-version = "0.9.0-beta.2"
+version = "0.9.0-beta.3"
 description = "AI Terminal Hub"
 authors = ["Backhacandy"]
 edition = "2021"
