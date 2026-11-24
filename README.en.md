@@ -9,6 +9,16 @@ For people who keep Claude Code and Codex CLI sessions open per project and hop 
 > The app UI is Korean-only for now. English UI is planned.
 
 <!-- MEASURE-EN:START -->
+**Measured** — 5 Claude Code sessions open and idle (Windows 11 · 16GB · 2026-11-25 · 0.9.0-beta.5)
+
+| | Memory (sum of working sets) |
+|---|---|
+| Without the hub · 5 terminal windows | ~**1,498MB** |
+| AITermHub, 5 tabs, all asleep after 15 idle minutes (app included) | ~**421MB** |
+
+- Measured: working sets of each session's process tree (cmd, claude, conhost). The hub side includes the app and its WebView2 UI; the terminal app itself (Windows Terminal) is not counted on the no-hub side.
+- Sleeping sessions are suspended and their memory is handed back to Windows (paged out if needed); sending a message wakes the same process and it continues.
+- Terminal tabs sleep after 15 idle minutes, structured Claude tabs after 2 (configurable). While awake, the hub costs its UI on top.
 <!-- MEASURE-EN:END -->
 
 ## Why

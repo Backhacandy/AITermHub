@@ -7,6 +7,16 @@ Claude Code · Codex CLI를 프로젝트마다 탭으로 열어 두고 오가는
 [English](README.en.md) · [사용 설명](docs/guide/README.md) · [내려받기](https://github.com/Backhacandy/AITermHub/releases/latest) · 무료 · 오픈소스(AGPL-3.0)
 
 <!-- MEASURE:START -->
+**직접 잰 결과** — Claude Code 5개를 열어 두고 아무것도 시키지 않은 상태 (Windows 11 · 16GB · 2026-11-25 · 0.9.0-beta.5)
+
+| | 메모리(작업 집합 합계) |
+|---|---|
+| 허브 없이 · 터미널 창 5개 | 약 **1,498MB** |
+| AITermHub 탭 5개 · 15분 쉬어 모두 잠든 뒤 (앱 자체 포함) | 약 **421MB** |
+
+- 잰 것: 세션 프로세스 트리(cmd·claude·conhost) 작업 집합의 합. 허브 쪽은 앱과 화면(WebView2)까지 모두 더했어요. 터미널 앱(Windows Terminal) 자체는 허브 없는 쪽에 넣지 않았어요.
+- 잠든 세션은 프로세스를 멈추고 메모리를 Windows에 돌려줘요(필요하면 디스크로 내려감). 다시 지시하면 같은 프로세스가 깨어나 이어서 해요.
+- 터미널 탭은 15분, 구조화 Claude 탭은 2분 쉬면 잠들어요(설정에서 바꿀 수 있어요). 깨어 있는 동안에는 허브 쪽이 앱 화면만큼 더 써요.
 <!-- MEASURE:END -->
 
 ## 왜 만들었나

@@ -12,3 +12,6 @@ dist/
 
 # Claude Code 로컬 설정
 .claude/
+
+# 홍보 영상 결과물(크다·다시 만들 수 있음)
+promo/out/
