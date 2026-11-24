@@ -61,3 +61,20 @@ describe("일이 끝난 뒤 설치 — 무엇을 일로 세나", () => {
     expect(isBusy({}, { t2: true })).toBe(true);
   });
 });
+
+import { cancelDeferred } from "./updater.svelte";
+describe("'일이 끝난 뒤'를 취소", () => {
+  it("배너를 닫지 않고 다시 고를 수 있게 돌아간다(업데이트 알림은 남음)", async () => {
+    vi.useFakeTimers();
+    const install = vi.fn(async () => {});
+    const d = deps({ check: async () => ({ version: "0.9.0-beta.2" }), install, busy: () => true });
+    await checkNow(d);
+    installWhenIdle(d);
+    cancelDeferred();
+    expect(upd.deferred).toBe(false);
+    expect(upd.available).toBe("0.9.0-beta.2");
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(install).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+});

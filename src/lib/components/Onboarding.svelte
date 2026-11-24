@@ -45,7 +45,7 @@
           {/if}
         </div>
       {/each}
-      {#if st && !ready}<p class="dim">둘 중 하나만 있어도 돼요. 터미널에서 위 명령으로 설치한 뒤 다시 확인을 눌러 주세요(Node.js가 필요해요). 로그인은 첫 세션을 열면 CLI가 안내해요. {restartHint(st)}</p>{/if}
+      {#if st && !ready}<p class="dim">둘 중 하나만 있어도 돼요. 터미널에서 위 명령으로 설치한 뒤 다시 확인을 눌러 주세요(Codex는 Node.js가 필요해요). 로그인은 첫 세션을 열면 CLI가 안내해요. {restartHint(st)}</p>{/if}
       <div class="nav">
         <button onclick={recheck} disabled={checking}>다시 확인</button>
         <span class="sp"></span>

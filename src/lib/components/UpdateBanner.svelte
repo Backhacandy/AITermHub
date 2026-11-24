@@ -1,7 +1,7 @@
 <!-- Copyright (c) 2026 Backhacandy. Licensed under AGPL-3.0-or-later. -->
 <script lang="ts">
   // 새 버전 알림: 지금 설치 / 일이 끝난 뒤 / 나중에. 누르기 전에는 아무것도 설치하지 않는다.
-  import { upd, installNow, installWhenIdle, dismiss } from "$lib/updater.svelte";
+  import { upd, installNow, installWhenIdle, cancelDeferred, dismiss } from "$lib/updater.svelte";
   import { appUpdateDeps } from "$lib/updaterApp";
   import { working, background } from "$lib/stats.svelte";
   import { isBusy } from "$lib/updater.svelte";
@@ -15,7 +15,7 @@
       <span class="dim">설치하는 중… 끝나면 다시 시작해요</span>
     {:else if upd.deferred}
       <span class="dim">일이 끝나면 설치하고 다시 시작해요</span>
-      <button onclick={dismiss}>취소</button>
+      <button onclick={cancelDeferred}>취소</button>
     {:else}
       <button class="pri" onclick={() => installNow(appUpdateDeps)}>{busy ? "지금 설치(하던 일 멈춤)" : "지금 설치"}</button>
       {#if busy}<button onclick={() => installWhenIdle(appUpdateDeps)}>일이 끝난 뒤</button>{/if}

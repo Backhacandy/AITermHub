@@ -73,6 +73,13 @@ export function installWhenIdle(d: UpdateDeps): void {
   }, 60_000);
 }
 
+/** '일이 끝난 뒤'를 취소: 배너는 남기고 다시 고를 수 있게 */
+export function cancelDeferred() {
+  upd.deferred = false;
+  clearInterval(idleTimer);
+  idleTimer = undefined;
+}
+
 export function dismiss() {
   upd.available = null;
   upd.deferred = false;

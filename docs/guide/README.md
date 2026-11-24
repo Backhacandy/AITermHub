@@ -7,7 +7,7 @@
 
 ## 2. 처음 켜기
 - Claude Code·Codex CLI가 설치돼 있는지 확인해요. 없으면 설치 명령을 복사해 터미널에서 실행한 뒤 **다시 확인**.
-  - Claude Code: `npm install -g @anthropic-ai/claude-code`
+  - Claude Code(PowerShell): `irm https://claude.ai/install.ps1 | iex`
   - Codex: `npm install -g @openai/codex`
 - 로그인은 첫 세션을 열면 각 CLI가 안내해요. AITermHub는 로그인 정보를 읽거나 옮기지 않아요.
 

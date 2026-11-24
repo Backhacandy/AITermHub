@@ -16,8 +16,9 @@ export function nextStep(s: CliStatus): "install" | "ready" {
   return s.claude === "installed" || s.codex === "installed" ? "ready" : "install";
 }
 
-export const INSTALL_CMD = { claude: "npm install -g @anthropic-ai/claude-code", codex: "npm install -g @openai/codex" };
-export const DOCS = { claude: "https://docs.anthropic.com/en/docs/claude-code/overview", codex: "https://github.com/openai/codex" };
+// Claude Code는 공식 권장이 네이티브 설치(PowerShell). npm 설치(npm i -g @anthropic-ai/claude-code)도 된다
+export const INSTALL_CMD = { claude: "irm https://claude.ai/install.ps1 | iex", codex: "npm install -g @openai/codex" };
+export const DOCS = { claude: "https://docs.claude.com/en/docs/claude-code/setup", codex: "https://github.com/openai/codex" };
 
 /** CLI가 없어도 넘어갈 수 있다(터미널 탭·다른 에이전트만 쓰는 사람, 나중에 설치할 사람) */
 export const canContinue = (_s: CliStatus) => true;
