@@ -1,0 +1,162 @@
+/* ===== 디자인 토큰 =====
+   dark  : 모던(기본) — 거의 무채색, 포인트 한 색, 카드·패널은 면 색 + 테두리로 또렷하게 구분
+   vs    : Visual Studio 다크 — 각진 모서리, 파란 포인트, 파란 상태 표시줄
+   light : 모던 라이트 */
+:root {
+  --bg: #0f1013;
+  --bg-elev: #15161a;
+  --surface: #1b1c21;
+  --surface-2: #23252b;
+  --fg: #ececef;
+  --fg-dim: #b3b6bf;
+  --muted: #7f838e;
+  --border: #2d3037;
+  --border-soft: #22242a;
+  --accent: #7380f5;
+  --accent-soft: rgba(115, 128, 245, 0.14);
+  --accent-fg: #ffffff;
+  --accent-2: #9a8ef0;
+  --ok: #3fb27f;
+  --sleep: #6a9be8;
+  --danger: #e5544f;
+  --warn: #d9a441;
+
+  --term-bg: #111216;
+  --term-fg: #e4e5ea;
+
+  --statusbar: #15161a;
+  --statusbar-fg: #9a9ea8;
+
+  --radius: 10px;
+  --radius-sm: 7px;
+  --radius-lg: 12px;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --ease: 140ms cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --font: "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --mono: "Cascadia Mono", "Cascadia Code", Consolas, "D2Coding", monospace;
+
+  --preset-claude: #d97757;
+  --preset-codex: #10a37f;
+  --preset-powershell: #5b8fd8;
+  --preset-agent: #8f7fd6;
+}
+
+:root[data-theme="vs"] {
+  --bg: #1e1e1e;
+  --bg-elev: #252526;
+  --surface: #2d2d30;
+  --surface-2: #3e3e42;
+  --fg: #f1f1f1;
+  --fg-dim: #cccccc;
+  --muted: #9d9d9d;
+  --border: #3f3f46;
+  --border-soft: #333337;
+  --accent: #007acc;
+  --accent-soft: rgba(0, 122, 204, 0.22);
+  --accent-fg: #ffffff;
+  --accent-2: #b180d7;
+  --ok: #57a64a;
+  --sleep: #569cd6;
+  --danger: #f14c4c;
+  --warn: #d7ba7d;
+  --term-bg: #1e1e1e;
+  --term-fg: #d4d4d4;
+  --statusbar: #007acc;
+  --statusbar-fg: #ffffff;
+  --radius: 3px;
+  --radius-sm: 2px;
+  --radius-lg: 4px;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --font: "Segoe UI", "Malgun Gothic", sans-serif;
+  --mono: "Cascadia Mono", Consolas, "D2Coding", monospace;
+}
+
+:root[data-theme="light"] {
+  --bg: #f6f7f9;
+  --bg-elev: #fbfbfc;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --fg: #1b1d22;
+  --fg-dim: #464a53;
+  --muted: #7a7f8a;
+  --border: #dcdfe5;
+  --border-soft: #e9ebef;
+  --accent: #4f5bd5;
+  --accent-soft: rgba(79, 91, 213, 0.1);
+  --accent-fg: #ffffff;
+  --accent-2: #7a68d0;
+  --ok: #23905f;
+  --sleep: #3f78d0;
+  --danger: #d23d38;
+  --warn: #b7841f;
+  --term-bg: #ffffff;
+  --term-fg: #1b1d22;
+  --statusbar: #eef0f3;
+  --statusbar-fg: #5c606a;
+  --shadow: 0 14px 34px rgba(30, 35, 50, 0.16);
+  --shadow-sm: 0 2px 6px rgba(30, 35, 50, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 13px;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 공통 버튼/스크롤바 느낌 */
+button {
+  font-family: inherit;
+  transition: background var(--ease), color var(--ease), border-color var(--ease);
+}
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+code, kbd, pre, .mono { font-family: var(--mono); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* 상태 점 공용 */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--muted);
+}
+.dot[data-preset="claude"] { background: var(--preset-claude); }
+.dot[data-preset="codex"] { background: var(--preset-codex); }
+.dot[data-preset="powershell"] { background: var(--preset-powershell); }
+.dot[data-preset="agent"] { background: var(--preset-agent); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.pulse { animation: pulse 1.4s ease-in-out infinite; }
+/* Windows "애니메이션 효과" 끔: 계속 도는 표시(점 깜빡임 등)는 멈춘다 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-iteration-count: 1 !important; animation-duration: 0.01ms !important; }
+}

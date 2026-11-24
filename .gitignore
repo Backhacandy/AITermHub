@@ -1,0 +1,14 @@
+node_modules/
+/build/
+.svelte-kit/
+dist/
+/src-tauri/target/
+/src-tauri/gen/schemas/
+.DS_Store
+*.log
+
+# 브레인스토밍 시안(비주얼 컴패니언)
+.superpowers/
+
+# Claude Code 로컬 설정
+.claude/

@@ -1,0 +1,54 @@
+[package]
+name = "aitermhub"
+version = "0.1.0"
+description = "AI Terminal Hub"
+authors = ["Backhacandy"]
+edition = "2021"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[lib]
+name = "aitermhub_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+anyhow = "1"
+portable-pty = "0.8"
+base64 = "0.22"
+notify = "8.2"
+encoding_rs = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_System_ProcessStatus",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_JobObjects",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+] }
+tauri-plugin-notification = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+
+# 메모리 부족 환경 대비 가벼운 릴리스 프로파일
+[features]
+# 개발판 기본. 배포판은 --no-default-features로 빌드해 계정 여러 개 기능을 뺀다
+default = ["multi-account"]
+multi-account = []
+
+[profile.release]
+# 가볍게 빌드: thin LTO(보호는 strip·최적화·JS 난독화) — fat LTO·한 덩어리 컴파일은 47분·메모리 많이 들어 뺌
+codegen-units = 16
+lto = "thin"
+opt-level = 3
+panic = "abort"
+strip = true
