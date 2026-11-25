@@ -3,6 +3,7 @@
   import { onMount, onDestroy } from "svelte";
   import { Terminal } from "@xterm/xterm";
   import { FitAddon } from "@xterm/addon-fit";
+  import { sizeUsable, dimsUsable } from "$lib/termSize";
   import { SearchAddon } from "@xterm/addon-search";
   import "@xterm/xterm/css/xterm.css";
   import { invoke } from "@tauri-apps/api/core";
@@ -70,6 +71,8 @@
     term.loadAddon(search);
     term.open(container);
     fit.fit();
+    // 숨겨진 채 만들어진 탭(복원 등)은 아주 작게 맞춰질 수 있다 — 그 크기로 CLI를 시작하지 않는다(보일 때 다시 맞춘다)
+    if (!dimsUsable(term.cols, term.rows)) term.resize(100, 30);
 
     const decoder = new TextDecoder();
     // 탭 전용 이벤트(pty-output-<id>)만 구독 — 다른 탭 출력까지 모든 탭이 받던 낭비 제거
@@ -117,10 +120,7 @@
       exited = true;
     }
 
-    ro = new ResizeObserver(() => {
-      fit.fit();
-      invoke("session_resize", { id, cols: term.cols, rows: term.rows }).catch(() => {});
-    });
+    ro = new ResizeObserver(() => syncSize());
     ro.observe(container);
   });
 
@@ -129,9 +129,8 @@
     if (active && term && fit) {
       requestAnimationFrame(() => {
         try {
-          fit.fit();
+          syncSize();
           term.focus();
-          invoke("session_resize", { id, cols: term.cols, rows: term.rows }).catch(() => {});
         } catch {}
       });
     }
@@ -149,11 +148,22 @@
     if (term && term.options.fontSize !== fs) {
       term.options.fontSize = fs;
       try {
-        fit?.fit();
-        invoke("session_resize", { id, cols: term.cols, rows: term.rows }).catch(() => {});
+        syncSize();
       } catch {}
     }
   });
+
+  /**
+   * 화면 크기에 맞추고 CLI(PTY)에도 알린다. 탭이 숨겨졌거나(display:none) 분할 배치가 바뀌는 중이라
+   * 너무 작으면 건너뛴다 — 아주 좁은 크기를 받은 CLI가 좁게 다시 그린 채 잠들면, 깰 때까지 화면이 깨져 보였다.
+   */
+  function syncSize() {
+    if (!term || !fit || !container) return;
+    if (!sizeUsable(container.clientWidth, container.clientHeight)) return;
+    fit.fit();
+    if (!dimsUsable(term.cols, term.rows)) return;
+    invoke("session_resize", { id, cols: term.cols, rows: term.rows }).catch(() => {});
+  }
 
   function doSearch(dir: 1 | -1) {
     if (!searchQuery) return;

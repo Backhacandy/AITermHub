@@ -1,7 +1,7 @@
 // Copyright (c) 2026 Backhacandy. Licensed under AGPL-3.0-or-later.
 // 처음 켠 사람 안내: PC에 있는 AI CLI(Claude Code·Codex·Gemini 등)를 찾는다.
 // 로그인 여부는 각 CLI의 상태 명령에게 묻는다(Tauri cli_login) — 로그인 정보 파일은 읽지 않는다.
-import { CLI_AGENTS } from "./agents/registry";
+import { CLI_AGENTS, MAIN_AIS } from "./agents/registry";
 
 export type CliState = "missing" | "installed";
 export interface CliStatus {
@@ -38,9 +38,26 @@ export function loginLabel(login: boolean | null | undefined): string {
   return "설치됨";
 }
 
-// Claude Code는 공식 권장이 네이티브 설치(PowerShell). npm 설치(npm i -g @anthropic-ai/claude-code)도 된다
-export const INSTALL_CMD = { claude: "irm https://claude.ai/install.ps1 | iex", codex: "npm install -g @openai/codex" };
-export const DOCS = { claude: "https://docs.claude.com/en/docs/claude-code/setup", codex: "https://github.com/openai/codex" };
+const main = (id: string) => MAIN_AIS.find((a) => a.id === id)!;
+export const INSTALL_CMD = { claude: main("claude").install, codex: main("codex").install };
+export const DOCS = { claude: main("claude").site, codex: main("codex").site };
+
+/** 설치된 AI id(Claude·Codex·다른 AI 순) */
+export function installedIds(s: CliStatus): string[] {
+  return [...(s.claude === "installed" ? ["claude"] : []), ...(s.codex === "installed" ? ["codex"] : []), ...s.others];
+}
+
+/** 로그인 확인 결과(true 됨 · false 안 됨 · null 확인 못 함 · undefined 확인 중) */
+export type LoginMap = Record<string, boolean | null | undefined>;
+
+/**
+ * 시작 조건: Claude·Codex가 필수가 아니라, 쓸 수 있는 AI가 하나 이상.
+ * 로그인을 확인할 수 있는 AI(Claude·Codex)는 로그인됨(또는 상태 명령이 답을 못 함)일 때,
+ * 확인 명령이 없는 다른 AI는 설치만 돼 있으면 쓸 수 있는 것으로 본다(처음 열 때 그 AI가 로그인을 안내).
+ */
+export function readyToGo(s: CliStatus, login: LoginMap): boolean {
+  return installedIds(s).some((id) => (id === "claude" || id === "codex" ? login[id] === true || login[id] === null : true));
+}
 
 /** CLI가 없어도 넘어갈 수 있다(터미널 탭만 쓰는 사람, 나중에 설치할 사람) */
 export const canContinue = (_s: CliStatus) => true;

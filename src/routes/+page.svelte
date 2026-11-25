@@ -39,6 +39,7 @@
   import { startUpdateWatch } from "$lib/updater.svelte";
   import { appUpdateDeps } from "$lib/updaterApp";
   import UpdateBanner from "$lib/components/UpdateBanner.svelte";
+  import ThanksBanner from "$lib/components/ThanksBanner.svelte";
   import Onboarding from "$lib/components/Onboarding.svelte";
   let teamOn = $derived(teamEnabled(settings, tabs.filter((t) => t.kind === "pair").length));
   import Splitter from "$lib/components/Splitter.svelte";
@@ -219,6 +220,7 @@
 
   <main class="center">
     <UpdateBanner />
+    <ThanksBanner />
     <header class="bar">
       <Tabs />
       <div class="newtab">
@@ -242,7 +244,7 @@
             {/if}
             <div class="sep"></div>
             <button onclick={openPreview}><span class="mi"><Icon name="globe" size={14} /></span>웹 미리보기<span class="hint">개발 서버</span></button>
-            <button onclick={() => { menuOpen = false; agentsOpen = true; }}><span class="mi"><Icon name="agent" size={14} /></span>다른 에이전트<span class="hint">Gemini · OpenCode 등</span></button>
+            <button onclick={() => { menuOpen = false; agentsOpen = true; }}><span class="mi"><Icon name="agent" size={14} /></span>AI 추가<span class="hint">Claude · Codex · Gemini 등</span></button>
           </div>
         {/if}
       </div>
@@ -390,11 +392,11 @@
   .mh { padding: 6px 9px 4px; font-size: 11px; color: var(--muted); }
   .menu button {
     display: flex; align-items: center; gap: 10px;
-    padding: 7px 9px; border: none; border-radius: var(--radius-sm);
+    padding: 7px 9px; border: none; border-radius: var(--radius-sm); white-space: nowrap;
     background: transparent; color: var(--fg); font-size: 12.5px; text-align: left; cursor: pointer;
   }
   .menu button:hover { background: var(--surface-2); }
-  .menu .hint { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .menu .hint { margin-left: auto; padding-left: 14px; font-size: 11px; color: var(--muted); }
   .mi { display: grid; place-items: center; width: 14px; color: var(--muted); }
   .d { width: 8px; height: 8px; margin: 0 3px; border-radius: 50%; }
   .d.claude { background: var(--preset-claude); }
@@ -409,7 +411,7 @@
   }
   .grid-toggle button:hover { color: var(--fg); }
   .grid-toggle button.on { background: var(--surface-2); color: var(--fg); }
-  .total { padding: 0 4px; font-size: 11.5px; color: var(--muted); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .total { padding: 0 4px; white-space: nowrap; font-size: 11.5px; color: var(--muted); font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
   .stage { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   .grid { position: relative; flex: 1; min-height: 0; display: grid; gap: 6px; padding: 6px; }

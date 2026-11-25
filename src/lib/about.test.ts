@@ -11,6 +11,11 @@ describe("정보 화면", () => {
     expect(showSponsor({ ...ABOUT, sponsor: "" })).toBe(false);
     expect(showSponsor({ ...ABOUT, sponsor: "https://github.com/sponsors/Backhacandy" })).toBe(true);
   });
+  it("만든 사람 표시(라이선스 7조 b항으로 유지를 요구하는 문구)와 인스타 주소", () => {
+    expect(ABOUT.credit).toBe("Made by Backhacandy");
+    expect(ABOUT.instagram).toBe("https://www.instagram.com/aitermhub/");
+    expect(ABOUT.authorInstagram).toBe("https://www.instagram.com/i_dh0101/");
+  });
   it("라이선스와 저장소", () => {
     expect(ABOUT.license).toBe("AGPL-3.0-or-later");
     expect(ABOUT.repo).toBe("https://github.com/Backhacandy/AITermHub");

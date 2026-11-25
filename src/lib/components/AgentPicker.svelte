@@ -4,8 +4,8 @@
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { open as openDialog } from "@tauri-apps/plugin-dialog";
-  import { CLI_AGENTS, launchArgs, type CliAgent } from "$lib/agents/registry";
-  import { addCliAgent, addInstallTab } from "$lib/sessions.svelte";
+  import { ALL_AIS, agentById, launchArgs, type AiEntry } from "$lib/agents/registry";
+  import { addCliAgent, addInstallTab, addClaude, addCodex } from "$lib/sessions.svelte";
   import { settings } from "$lib/settings.svelte";
   import Icon from "./Icon.svelte";
 
@@ -16,37 +16,43 @@
 
   async function check() {
     checking = true;
-    const r = await invoke<(string | null)[]>("which_cli", { names: CLI_AGENTS.map((a) => a.cmd) }).catch(() => []);
-    found = Object.fromEntries(CLI_AGENTS.map((a, i) => [a.id, r[i] ?? null]));
+    const r = await invoke<(string | null)[]>("which_cli", { names: ALL_AIS.map((a) => a.cmd) }).catch(() => []);
+    found = Object.fromEntries(ALL_AIS.map((a, i) => [a.id, r[i] ?? null]));
     checking = false;
   }
   onMount(check);
 
-  async function launch(a: CliAgent) {
+  async function launch(a: AiEntry) {
     const dir = await openDialog({ directory: true, title: `${a.name}로 작업할 폴더` });
     if (typeof dir !== "string") return;
-    addCliAgent(a, launchArgs(a, settings.fullAccess), dir);
+    const full = !!settings.fullAccess;
+    if (a.id === "claude") addClaude(dir, undefined, full ? "bypassPermissions" : "default");
+    else if (a.id === "codex") addCodex(dir, undefined, full ? "danger-full-access" : "workspace-write", full ? "never" : "on-request");
+    else {
+      const c = agentById(a.id);
+      if (c) addCliAgent(c, launchArgs(c, full), dir);
+    }
     onclose();
   }
-  function install(a: CliAgent) {
+  function install(a: AiEntry) {
     addInstallTab(a.name, a.install);
     onclose();
   }
 </script>
 
 <div class="overlay" onclick={onclose} role="presentation">
-  <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-label="다른 에이전트">
+  <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" aria-label="AI 추가">
     <header>
-      <span>다른 에이전트</span>
+      <span>AI 추가</span>
       <button class="x" aria-label="새로 확인" title="설치 여부 다시 확인" onclick={check}><Icon name="refresh" size={14} /></button>
       <button class="x" aria-label="닫기" onclick={onclose}><Icon name="close" size={14} /></button>
     </header>
     <p class="intro">
-      설치된 CLI 에이전트를 폴더에서 터미널 탭으로 열어요. 진행 로그·실시간 diff·계정 자동 전환·압축 관리는 Claude·Codex 탭에서만 돼요.
+      설치된 AI를 폴더에서 열어요. Claude Code·Codex는 진행 로그·실시간 diff·계정 자동 전환·압축 관리가 되는 전용 탭으로, 다른 AI는 터미널 탭으로 열려요.
       {settings.fullAccess ? "전체 권한이 켜져 있어 지원하는 에이전트는 확인 없이 실행해요." : ""}
     </p>
     <div class="list">
-      {#each CLI_AGENTS as a (a.id)}
+      {#each ALL_AIS as a (a.id)}
         {@const p = found[a.id]}
         <div class="row">
           <div class="info">

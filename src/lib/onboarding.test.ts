@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Backhacandy. Licensed under AGPL-3.0-or-later.
 import { describe, it, expect } from "vitest";
-import { detect, nextStep, canContinue, restartHint, loginLabel, CHECK_NAMES, type CliStatus } from "./onboarding";
+import { detect, nextStep, canContinue, restartHint, loginLabel, CHECK_NAMES, installedIds, readyToGo, type CliStatus } from "./onboarding";
 import { CLI_AGENTS } from "./agents/registry";
 
 const none = async (names: string[]) => names.map(() => null);
@@ -35,6 +35,30 @@ describe("첫 실행 안내", () => {
       throw new Error("x");
     });
     expect(s).toEqual(NONE);
+  });
+});
+
+describe("시작 조건: Claude·Codex가 필수가 아니라 AI 하나 이상", () => {
+  const C: CliStatus = { ...NONE, claude: "installed" };
+  it("설치된 AI를 Claude·Codex·다른 AI 순으로 모은다", () => {
+    expect(installedIds({ claude: "installed", codex: "missing", others: ["gemini"] })).toEqual(["claude", "gemini"]);
+  });
+  it("아무것도 없으면 못 넘어간다", () => {
+    expect(readyToGo(NONE, {})).toBe(false);
+  });
+  it("Claude가 설치만 되고 로그인 안 됐으면(또는 확인 중이면) 아직 아니다", () => {
+    expect(readyToGo(C, { claude: false })).toBe(false);
+    expect(readyToGo(C, {})).toBe(false);
+  });
+  it("Claude든 Codex든 하나만 로그인돼 있으면 된다", () => {
+    expect(readyToGo(C, { claude: true })).toBe(true);
+    expect(readyToGo({ ...NONE, codex: "installed" }, { codex: true })).toBe(true);
+  });
+  it("Claude·Codex가 없어도 다른 AI(로그인 확인 명령이 없음)가 있으면 된다 — 로그인은 처음 열 때 그 AI가 안내", () => {
+    expect(readyToGo({ ...NONE, others: ["gemini"] }, {})).toBe(true);
+  });
+  it("로그인 상태 명령이 답을 못 하면(확인 못 함) 설치된 것으로 인정한다", () => {
+    expect(readyToGo(C, { claude: null })).toBe(true);
   });
 });
 

@@ -36,6 +36,19 @@
     const dir = t.cwd?.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
     return dir && t.kind !== "term" && t.kind !== "company" && !base.includes(" · ") ? `${base} · ${dir}` : base;
   }
+  // 탭이 많아 넘치면: 활성 탭이 늘 보이게 스크롤하고, 세로 휠로 옆으로 넘긴다
+  let bar: HTMLDivElement | undefined = $state();
+  $effect(() => {
+    const id = active.id;
+    tabs.length;
+    requestAnimationFrame(() => bar?.querySelector<HTMLElement>(`[data-id="${CSS.escape(id ?? "")}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" }));
+  });
+  function onWheel(e: WheelEvent) {
+    if (!bar || bar.scrollWidth <= bar.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    bar.scrollLeft += e.deltaY;
+    e.preventDefault();
+  }
+
   function iconOf(t: TabInfo): string | null {
     if (t.kind === "pair") return "pair";
     if (t.kind === "compare") return "swap";
@@ -48,10 +61,10 @@
   }
 </script>
 
-<div class="tabs" role="tablist">
+<div class="tabs" role="tablist" bind:this={bar} onwheel={onWheel}>
   {#each tabs as t (t.id)}
     {@const ic = iconOf(t)}
-    <div class="tab" class:active={active.id === t.id} role="tab" aria-selected={active.id === t.id} title={clean(t)}>
+    <div class="tab" class:active={active.id === t.id} role="tab" aria-selected={active.id === t.id} title={clean(t)} data-id={t.id}>
       <button class="hit" onclick={() => (active.id = t.id)}>
         {#if ic}<span class="ic" data-kind={t.kind}><Icon name={ic} size={14} /></span>{:else}<span class="dot" data-preset={t.preset}></span>{/if}
         <span class="name">{clean(t)}</span>
@@ -76,6 +89,8 @@
     align-items: center;
     border-right: 1px solid var(--border-soft);
     color: var(--muted);
+    flex: 0 1 auto;
+    min-width: 110px;
     max-width: 240px;
   }
   .tab:hover { color: var(--fg); background: var(--surface); }

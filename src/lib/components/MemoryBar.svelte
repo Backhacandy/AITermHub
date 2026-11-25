@@ -130,7 +130,7 @@
   }
   .btns button:hover { background: var(--border); }
   .btns button.wake { background: #2a3550; color: #8fb0ff; border-color: #3a4a70; }
-  .btns button.pin { flex: 0 0 34px; }
+  .btns button.pin { flex: 0 0 34px; display: grid; place-items: center; padding: 0; }
   .btns button.pin.on { background: #4a4a20; }
   .empty { padding: 20px; text-align: center; color: var(--muted); font-size: 12px; }
 </style>

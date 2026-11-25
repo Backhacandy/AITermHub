@@ -15,6 +15,11 @@
 <div class="about" data-build={ABOUT.marker}>
   <div class="t">{ABOUT.name} <span class="v">{version}{flavor() === "dev" ? " · 개발판" : ""}</span></div>
   <div class="dim">{ABOUT.copyright} · {ABOUT.license}</div>
+  <div class="credit">
+    <b>{ABOUT.credit}</b>
+    <button onclick={() => open(ABOUT.authorInstagram)}>만든 사람 인스타</button>
+    <button onclick={() => open(ABOUT.instagram)}>새 소식 @aitermhub</button>
+  </div>
   <div class="links">
     <button onclick={() => open(ABOUT.repo)}>저장소</button>
     <button onclick={() => open(ABOUT.issues)}>버그 신고 · 제안</button>
@@ -37,5 +42,8 @@
   .links { display: flex; gap: 6px; margin: 8px 0; }
   .links button { font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line, #444); background: transparent; color: inherit; cursor: pointer; }
   .sub { margin-top: 8px; font-weight: 600; }
+  .credit { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: var(--accent-soft, #2a3350); }
+  .credit b { margin-right: auto; }
+  .credit button { font-size: 12px; padding: 2px 10px; border-radius: 6px; border: 1px solid var(--line, #444); background: transparent; color: inherit; cursor: pointer; }
   ul { margin: 4px 0; padding-left: 18px; }
 </style>

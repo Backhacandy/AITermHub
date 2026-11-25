@@ -140,10 +140,11 @@
     border-radius: 12px;
   }
   .mode {
-    width: 34px; height: 34px;
+    height: 34px; padding: 0 10px;
+    white-space: nowrap;
     background: transparent;
     color: var(--muted);
-    font-size: 15px;
+    font-size: 12.5px;
   }
   .mode:hover { background: var(--surface-2); }
   .mode.on { background: var(--accent-soft); color: var(--accent); }

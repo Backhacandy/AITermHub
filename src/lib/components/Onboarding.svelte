@@ -3,15 +3,16 @@
   // 처음 켰을 때 세 장: ① PC에 있는 AI CLI 찾기(로그인 여부는 CLI에게 묻는다) ② 쉬는 세션은 잠든다 ③ 다시 오면 이어진다
   import { onMount } from "svelte";
   import { invoke } from "@tauri-apps/api/core";
-  import { detect, nextStep, restartHint, loginLabel, INSTALL_CMD, DOCS, type CliStatus } from "$lib/onboarding";
-  import { agentById } from "$lib/agents/registry";
+  import { detect, restartHint, loginLabel, installedIds, readyToGo, type CliStatus } from "$lib/onboarding";
+  import { ALL_AIS, type AiEntry } from "$lib/agents/registry";
+  import { addInstallTab } from "$lib/sessions.svelte";
 
   let { ondone }: { ondone: () => void } = $props();
   let page = $state(0);
   let st = $state<CliStatus | null>(null);
   let checking = $state(false);
   let copied = $state("");
-  /** Claude·Codex 로그인 여부(undefined = 확인 중) */
+  /** 로그인 여부 — 상태 명령이 있는 Claude·Codex만(undefined = 확인 중) */
   let login = $state<Record<string, boolean | null | undefined>>({});
 
   async function recheck() {
@@ -24,13 +25,18 @@
   }
   onMount(recheck);
 
-  async function copy(k: "claude" | "codex") {
-    await navigator.clipboard.writeText(INSTALL_CMD[k]).catch(() => {});
-    copied = k;
+  async function copy(a: AiEntry) {
+    await navigator.clipboard.writeText(a.install).catch(() => {});
+    copied = a.id;
     setTimeout(() => (copied = ""), 1500);
   }
-  const openDoc = (k: "claude" | "codex") => invoke("open_path", { path: DOCS[k] }).catch(() => {});
-  let ready = $derived(st !== null && nextStep(st) === "ready");
+  const openDoc = (a: AiEntry) => invoke("open_path", { path: a.site }).catch(() => {});
+  /** 로그인: 터미널 탭에서 로그인 명령을 띄운다(비밀번호 등은 그 CLI가 직접 받는다). 끝나면 다시 확인 */
+  const doLogin = (a: AiEntry) => a.loginCmd && addInstallTab(`${a.name} 로그인`, a.loginCmd);
+  let ready = $derived(st !== null && readyToGo(st, login));
+  let have = $derived(st ? installedIds(st) : []);
+  /** 설치된 AI 먼저, 그다음 설치할 수 있는 AI */
+  let rows = $derived([...ALL_AIS.filter((a) => have.includes(a.id)), ...ALL_AIS.filter((a) => !have.includes(a.id))]);
 </script>
 
 <div class="ob" role="dialog" aria-modal="true" aria-label="처음 시작하기">
@@ -38,28 +44,31 @@
     {#if page === 0}
       <h2>AITermHub에 오신 걸 환영해요</h2>
       <p>AI 코딩 CLI(Claude Code·Codex·Gemini 등)를 여러 개 켜 둬도 PC가 가볍게 유지되도록 돕는 세션 관리자예요. 이 PC에 있는 AI부터 찾아볼게요.</p>
-      {#each ["claude", "codex"] as const as k (k)}
-        <div class="row">
-          <span class="nm">{k === "claude" ? "Claude Code" : "Codex"}</span>
-          {#if st === null}<span class="dim">확인 중…</span>
-          {:else if st[k] === "installed"}<span class="ok" class:warn={login[k] === false}>{loginLabel(login[k])}</span>
-          {:else}
-            <span class="no">없음</span>
-            <code>{INSTALL_CMD[k]}</code>
-            <button onclick={() => copy(k)}>{copied === k ? "복사됨" : "복사"}</button>
-            <button onclick={() => openDoc(k)}>안내</button>
-          {/if}
-        </div>
-      {/each}
-      {#if st?.others.length}
-        <div class="row"><span class="nm">다른 AI</span><span class="ok">{st.others.map((id) => agentById(id)?.name ?? id).join(" · ")}</span></div>
-        <p class="dim">다른 AI는 위쪽 ＋ → 새로 만들기에서 바로 열 수 있어요. 로그인은 처음 열 때 각 AI가 안내해요.</p>
-      {/if}
-      {#if st && !ready}<p class="dim">하나만 있어도 돼요(Gemini 같은 다른 AI도 돼요). 터미널에서 위 명령으로 설치한 뒤 다시 확인을 눌러 주세요(Codex는 Node.js가 필요해요). 로그인은 첫 세션을 열면 CLI가 안내해요. {restartHint(st)}</p>{/if}
+      <p class="need">AI CLI를 <b>하나 이상</b> 로그인하면 시작할 수 있어요. 어떤 AI든 괜찮아요.</p>
+      <div class="list">
+        {#each rows as a (a.id)}
+          {@const on = have.includes(a.id)}
+          <div class="row">
+            <span class="nm">{a.name}</span>
+            {#if st === null}<span class="dim">확인 중…</span>
+            {:else if on && a.loginCmd}
+              <span class="ok" class:warn={login[a.id] === false}>{loginLabel(login[a.id])}</span>
+              {#if login[a.id] === false}<button onclick={() => doLogin(a)}>로그인</button>{/if}
+            {:else if on}<span class="ok">설치됨</span><span class="dim">· 로그인은 처음 열 때 안내</span>
+            {:else}
+              <span class="dim">설치 안 됨</span>
+              <span class="sp"></span>
+              <button onclick={() => copy(a)} title={a.install}>{copied === a.id ? "복사됨" : "설치 명령 복사"}</button>
+              <button onclick={() => openDoc(a)}>안내</button>
+            {/if}
+          </div>
+        {/each}
+      </div>
+      {#if st && !ready}<p class="dim">설치는 터미널에 명령을 붙여 넣으면 돼요. 설치나 로그인을 마친 뒤 다시 확인을 눌러 주세요. {restartHint(st)}</p>{/if}
       <div class="nav">
         <button onclick={recheck} disabled={checking}>다시 확인</button>
         <span class="sp"></span>
-        {#if st && !ready}<button onclick={ondone}>건너뛰기</button>{/if}
+        {#if st && !ready}<button onclick={ondone} title="터미널 탭만 쓸 때">AI 없이 시작</button>{/if}
         <button class="pri" onclick={() => (page = 1)} disabled={!ready}>다음</button>
       </div>
     {:else if page === 1}
@@ -80,11 +89,12 @@
   h2 { margin: 0 0 10px; font-size: 18px; }
   p { line-height: 1.6; font-size: 13.5px; }
   .row { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; font-size: 13px; }
-  .nm { width: 100px; font-weight: 600; }
+  .nm { width: 130px; font-weight: 600; }
+  .need { margin: 4px 0 8px; }
+  .list { max-height: 300px; overflow-y: auto; padding-right: 4px; }
+  .list .row { margin: 0; min-height: 40px; padding: 2px 0; border-bottom: 1px solid rgba(127, 127, 127, 0.12); flex-wrap: nowrap; }
   .ok { color: var(--ok, #6c6); }
   .ok.warn { color: var(--warn, #db6); }
-  .no { color: var(--danger, #f77); }
-  code { font-size: 12px; padding: 2px 6px; border-radius: 4px; background: rgba(127, 127, 127, 0.15); }
   .dim { opacity: 0.7; }
   .nav { display: flex; gap: 8px; margin-top: 16px; }
   .sp { flex: 1; }

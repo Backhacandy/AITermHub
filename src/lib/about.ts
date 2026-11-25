@@ -6,6 +6,12 @@ export const ABOUT = {
   license: "AGPL-3.0-or-later",
   repo: "https://github.com/Backhacandy/AITermHub",
   issues: "https://github.com/Backhacandy/AITermHub/issues/new/choose",
+  /** 만든 사람 표시 — NOTICE의 추가 조건(AGPL 7조 b항)으로, 고친 버전도 정보 화면에서 지우지 않고 유지해야 한다 */
+  credit: "Made by Backhacandy",
+  /** 프로젝트 소식 */
+  instagram: "https://www.instagram.com/aitermhub/",
+  /** 만든 사람 */
+  authorInstagram: "https://www.instagram.com/i_dh0101/",
   /** GitHub Sponsors 승인 뒤 채운다 */
   sponsor: "",
   marker: "aith-bk26-68a3b8a0b4ae",

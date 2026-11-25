@@ -9,3 +9,10 @@ later version. See LICENSE for the full text.
 If you modify this program and distribute it or let users interact with it over
 a network, you must make the complete corresponding source code of your version
 available under the same license.
+
+Additional terms under section 7(b) of the GNU AGPL v3:
+Any version of this program that is conveyed or made available to users,
+modified or not, must keep the author attribution "Made by Backhacandy",
+together with the copyright line, visible in the program's About screen
+(or, if it has no About screen, in an equally prominent place in its user
+interface). You may add your own attributions next to it.

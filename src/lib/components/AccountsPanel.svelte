@@ -98,7 +98,7 @@
   <div class="list">
     {#each ["claude", "codex"] as const as cli (cli)}
       <section>
-        <div class="sh"><i class="pd {cli}"></i>{NAME[cli]}{#if MA}<span class="dim">위에서부터 사용 · 한도가 차면 다음 계정으로</span>{/if}</div>
+        <div class="sh"><i class="pd {cli}"></i>{NAME[cli]}{#if MA}<span class="dim" title="위에서부터 사용 · 한도가 차면 다음 계정으로">위에서부터 사용 · 한도가 차면 다음 계정으로</span>{/if}</div>
         {#if !acc.loaded && acc.loading}
           <div class="empty">로그인된 계정을 찾는 중…</div>
         {:else if group(cli).length === 0}
@@ -172,7 +172,7 @@
   .list { flex: 1; overflow: auto; padding: 10px 10px 14px; }
   section { margin-bottom: 16px; }
   .sh { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; margin: 0 2px 8px; }
-  .sh .dim { margin-left: auto; }
+  .sh .dim { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 400; }
   .pd { width: 7px; height: 7px; border-radius: 50%; }
   .pd.claude { background: var(--preset-claude); }
   .pd.codex { background: var(--preset-codex); }

@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Backhacandy. Licensed under AGPL-3.0-or-later.
 // 세션 메모리 통계 + 작업중(출력 활동) 추적
 import { listen } from "@tauri-apps/api/event";
+import { noteStat } from "./thanksState.svelte";
 
 export interface Stat {
   id: string;
@@ -47,7 +48,10 @@ export async function startStats() {
     const incoming = e.payload;
     const ids = new Set(incoming.map((s) => s.id));
     for (const k of Object.keys(stats)) if (!ids.has(k)) delete stats[k];
-    for (const s of incoming) stats[s.id] = s;
+    for (const s of incoming) {
+      noteStat(stats[s.id], s);
+      stats[s.id] = s;
+    }
   });
 }
 
